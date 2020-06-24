@@ -1,21 +1,52 @@
-
-from utils import *
 import copy
+import itertools
+rows = 'ABCDEFGHI'
+cols = '123456789'
+history = []
 
+def cross(A, B):
+    "Cross product of elements in A and elements in B."
+    return [s+t for s in A for t in B]
+
+boxes = [r + c for r in rows for c in cols]
 row_units = [cross(r, cols) for r in rows]
 column_units = [cross(rows, c) for c in cols]
 square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
 unitlist = row_units + column_units + square_units
 
-diagonal_units = ([[val+key for val, key in zip(rows, cols)]] + [[val+key for val, key in zip(rows, cols[::-1])]])
+diagonal_units=[[s+t for s,t in zip(rows,cols)],[s+t for s,t in zip(rows,cols[::-1])]]
 # TODO: Update the unit list to add the new diagonal units
 unitlist = unitlist + diagonal_units
 
 # Must be called after all units (including diagonals) are added to the unitlist
-units = extract_units(unitlist, boxes)
-peers = extract_peers(units, boxes)
+units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
+peers = dict((s, set(sum(units[s],[]))-set([s]))for s in boxes)
 
+def assign_value(values, box, value):
+    """You must use this function to update your values dictionary if you want to
+    try using the provided visualization tool. This function records each assignment
+    (in order) for later reconstruction.
 
+    Parameters
+    ----------
+    values(dict)
+        a dictionary of the form {'box_name': '123456789', ...}
+
+    Returns
+    -------
+    dict
+        The values dictionary with the naked twins eliminated from peers
+    """
+    # Don't waste memory appending actions that don't actually change any values
+    if values[box] == value:
+        return values
+
+    values[box] = value
+    if len(value) == 1:
+        history.append(values.copy())
+    return values
+
+    
 def naked_twins(values):
     """Eliminate values using the naked twins strategy.
 
@@ -54,23 +85,55 @@ def naked_twins(values):
     https://github.com/udacity/artificial-intelligence/blob/master/Projects/1_Sudoku/pseudocode.md
     """
     # TODO: Implement this function!
-    # First we save those boxes that have only 2 options that could possibly be used to fill it
-    itemboxes = [box for box in values if len(values[box])==2]
-    naked_twins = []
-    # then we check if there is a box in the same row, column or square as boxA that has the same options available as boxA.
-    #If so, we save the boxes as tuples in the list naked_twins
-    for boxA in itemboxes:
-        for boxB in peers[boxA]:
-            if sorted(values[boxA]) == sorted(values[boxB]):
-                naked_twins = [(boxA,boxB)]
-    # Now we remove the options the boxes in naked_twins had from the other boxes in the same unit as the naked twins
-    for twins in naked_twins:
-        for peer in set(peers[twins[0]]).intersection(set(peers[twins[1]])):
-            for digit in values[twins[0]]:
-                values[peer] = values[peer].replace(digit,"")
+    # First we find those boxes that have only 2 options that could possibly be used to fill it
+    for unit in unitlist:
+        twooptionboxes = [box for box in unit if len(values[box])==2]
+    # then we pair up the boxes to make multiple possible combinations
+        possibletwins = [list(pair) for pair in itertools.combinations(twooptionboxes,2)] 
+    # Now finding the naked twins
+        for pair in possibletwins:
+            if values[pair[0]] == values[pair[1]]:
+                # Eliminating the naked twins from values
+                    for box in unit:
+                        if box!= pair[0] and box!= pair[1]:
+                            for digit in values[pair[0]]:
+                                values[box] = values[box].replace(digit,'')
     return values                                                        
     raise NotImplementedError
 
+def grid_values(grid):
+    """
+    Convert grid into a dict of {square: char} with '123456789' for empties.
+    Args:
+        grid(string) - A grid in string form.
+    Returns:
+        A grid in dictionary form
+            Keys: The boxes, e.g., 'A1'
+            Values: The value in each box, e.g., '8'. If the box has no value, then the value will be '123456789'.
+    """
+    chars = []
+    digits = '123456789'
+    for c in grid:
+        if c in digits:
+            chars.append(c)
+        if c == '.':
+            chars.append(digits)
+    assert len(chars) == 81
+    return dict(zip(boxes, chars))
+
+def display(values):
+    """
+    Display the values as a 2-D grid.
+    Args:
+        values(dict): The sudoku in dictionary form
+    """
+    width = 1+max(len(values[s]) for s in boxes)
+    line = '+'.join(['-'*(width*3)]*3)
+    for r in rows:
+        print(''.join(values[r+c].center(width)+('|' if c in '36' else '')
+                      for c in cols))
+        if r in 'CF': print(line)
+    return
 
 def eliminate(values):
     """Apply the eliminate strategy to a Sudoku puzzle
@@ -89,11 +152,12 @@ def eliminate(values):
         The values dictionary with the assigned values eliminated from peers
     """
     # TODO: Copy your code from the classroom to complete this function
-    for box in values:
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
+    for box in solved_values:
         digit = values[box]
         if len(digit) == 1:
             for peer in peers[box]:
-                values[peer] = values[peer].replace(digit,'')
+                values = assign_value(values,peer,values[peer].replace(digit, ''))
     return values
     raise NotImplementedError
 
@@ -143,10 +207,13 @@ def reduce_puzzle(values):
         no longer produces any changes, or False if the puzzle is unsolvable 
     """
     # TODO: Copy your code from the classroom and modify it to complete this function
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
     stalled = False
     while not stalled:
         solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
+        # Using Eliminate strategy
         values = eliminate(values)
+        # Using only choice strategy
         values = only_choice(values)
         values = naked_twins(values)
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
@@ -209,20 +276,18 @@ def solve(grid):
     dict or False
         The dictionary representation of the final sudoku grid or False if no solution exists.
     """
-    values = grid2values(grid)
+    values = grid_values(grid)
     values = search(values)
     return values
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
-    display(grid2values(diag_sudoku_grid))
-    result = solve(diag_sudoku_grid)
-    display(result)
+    display(solve(diag_sudoku_grid))
 
     try:
-        import PySudoku
-        PySudoku.play(grid2values(diag_sudoku_grid), result, history)
+        from visualize import visualize_assignments
+        visualize_assignments(assignments)
 
     except SystemExit:
         pass
