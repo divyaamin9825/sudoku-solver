@@ -1,3 +1,4 @@
+from utils import *
 import copy
 import itertools
 rows = 'ABCDEFGHI'
@@ -21,6 +22,7 @@ unitlist = unitlist + diagonal_units
 # Must be called after all units (including diagonals) are added to the unitlist
 units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
 peers = dict((s, set(sum(units[s],[]))-set([s]))for s in boxes)
+
 
 def assign_value(values, box, value):
     """You must use this function to update your values dictionary if you want to
@@ -121,6 +123,7 @@ def grid_values(grid):
     assert len(chars) == 81
     return dict(zip(boxes, chars))
 
+
 def display(values):
     """
     Display the values as a 2-D grid.
@@ -159,7 +162,6 @@ def eliminate(values):
             for peer in peers[box]:
                 values = assign_value(values,peer,values[peer].replace(digit, ''))
     return values
-    raise NotImplementedError
 
 
 def only_choice(values):
@@ -189,7 +191,6 @@ def only_choice(values):
             if len(dplaces) == 1:
                 values[dplaces[0]] = digit
     return values
-    raise NotImplementedError
 
 
 def reduce_puzzle(values):
@@ -221,29 +222,9 @@ def reduce_puzzle(values):
         if len([box for box in values.keys() if len(values[box]) == 0]):
             return False
     return values
-    raise NotImplementedError
 
 
 def search(values):
-    """Apply depth first search to solve Sudoku puzzles in order to solve puzzles
-    that cannot be solved by repeated reduction alone.
-
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict or False
-        The values dictionary with all boxes assigned or False
-
-    Notes
-    -----
-    You should be able to complete this function by copying your code from the classroom
-    and extending it to call the naked twins strategy.
-    """
-# First, reduce the puzzle using the previous function
     values = reduce_puzzle(values)
     if values is False:
         return False ## Failed earlier
@@ -258,8 +239,6 @@ def search(values):
         attempt = search(new_sudoku)
         if attempt:
             return attempt
-    raise NotImplementedError
-
 
 def solve(grid):
     """Find the solution to a Sudoku puzzle using search and constraint propagation
@@ -280,7 +259,7 @@ def solve(grid):
     values = search(values)
     return values
 
-
+# below code from http://www.analyzingdata.org/portfolio/300-sudoku/
 if __name__ == '__main__':
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
     display(solve(diag_sudoku_grid))
